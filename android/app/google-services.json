@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "546664122315",
+    "project_id": "english-education-b163e",
+    "storage_bucket": "english-education-b163e.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:546664122315:android:9d93b4d59599bf8f23184e",
+        "android_client_info": {
+          "package_name": "com.example.english_education"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAKUdqDPB8TCbo4QvGUtyEhGpUVWIlJyuU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
