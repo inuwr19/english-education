@@ -10,6 +10,7 @@ import 'package:english_education/screens/game/exercise_screen.dart';
 import 'package:english_education/screens/report_screen.dart';
 import 'package:english_education/shared/game_grade.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:english_education/screens/leaderboard_screen.dart';
 
 /// ---------- Helpers ----------
 GameGrade? _parseGrade(dynamic raw) {
@@ -146,6 +147,17 @@ Route<dynamic>? generateRoute(RouteSettings settings) {
         final userName = (args['playerName'] as String?) ?? 'Player';
         return MaterialPageRoute(
           builder: (_) => ReportScreen(playerName: userName, grade: grade),
+        );
+      }
+
+    // Leaderboard route
+    case '/leaderboard':
+      {
+        final args = settings.arguments as Map<String, dynamic>?;
+        // grade opsional; default Grade 1 kalau tidak dikirim
+        final grade = _parseGrade(args?['grade'] ?? 1) ?? GameGrade.grade1;
+        return MaterialPageRoute(
+          builder: (_) => LeaderboardScreen(initialGrade: grade),
         );
       }
 

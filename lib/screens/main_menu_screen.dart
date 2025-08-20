@@ -1,15 +1,13 @@
 import 'dart:math';
+import 'package:english_education/shared/route_observer.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:english_education/shared/sound_service.dart';
 
-class MainMenuScreen extends StatelessWidget {
+class MainMenuScreen extends StatefulWidget {
   final int grade; // 1..3
-  final String playerName; // bisa "unknown" (fallback ke prefs)
-  static const double kClusterDownFactor =
-      0.06; // 6% tinggi layar -> geser seluruh klaster turun
-  static const double kRowGapFactor =
-      0.26; // 26% dari tinggi tombol -> jarak LEARNING ke bawah
+  final String playerName; // bisa 'unknown' / kosong
 
   const MainMenuScreen({
     super.key,
@@ -17,25 +15,74 @@ class MainMenuScreen extends StatelessWidget {
     required this.playerName,
   });
 
-  // --- NAV helper ---
-  Future<void> navigateTo(BuildContext context, String type) async {
-    var name = playerName.trim();
-    if (name.isEmpty || name.toLowerCase() == 'unknown') {
-      final prefs = await SharedPreferences.getInstance();
-      name = (prefs.getString('playerName') ?? '').trim();
-      if (name.isEmpty) name = 'Player';
+  @override
+  State<MainMenuScreen> createState() => _MainMenuScreenState();
+}
+
+class _MainMenuScreenState extends State<MainMenuScreen> with RouteAware {
+  // Tuning layout
+  static const double kClusterDownFactor = 0.06; // geser cluster turun
+  static const double kRowGapFactor = 0.26; // jarak vertikal antar tombol
+
+  @override
+  void initState() {
+    super.initState();
+    // BGM menu
+    // SoundService.instance.playMenuBgm();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final route = ModalRoute.of(context);
+    if (route is PageRoute) {
+      routeObserver.subscribe(this, route); // ⬅️ subscribe
     }
+  }
+
+  @override
+  void dispose() {
+    routeObserver.unsubscribe(this); // ⬅️ unsubscribe
+    super.dispose();
+  }
+
+  // Dipanggil saat pertama kali route ini masuk stack & tampil
+  @override
+  void didPush() {
+    SoundService.instance.playMenuBgm();
+  }
+
+  // Dipanggil saat route di atasnya dipop (balik dari screen lain)
+  @override
+  void didPopNext() {
+    SoundService.instance.playMenuBgm();
+  }
+
+  // Dipanggil saat kita push screen lain (menu -> exercise/learning/etc)
+  @override
+  void didPushNext() {
+    // Halus, lalu screen berikut boleh memutar BGM-nya sendiri
+    SoundService.instance.fadeOutBgm(dur: const Duration(milliseconds: 150));
+  }
+
+  Future<String> _ensureName(String incoming) async {
+    final norm = incoming.trim();
+    if (norm.isNotEmpty && norm.toLowerCase() != 'unknown') return norm;
+    final prefs = await SharedPreferences.getInstance();
+    final fromPrefs = (prefs.getString('playerName') ?? '').trim();
+    return fromPrefs.isEmpty ? 'Player' : fromPrefs;
+  }
+
+  Future<void> _navigateTo(BuildContext context, String type) async {
+    SoundService.instance.tap(); // sfx klik
+    // Boleh skip fadeOut di sini karena sudah ada di didPushNext()
+    final name = await _ensureName(widget.playerName);
+    if (!mounted) return;
     Navigator.pushNamed(
       context,
       '/$type',
-      arguments: {'grade': grade, 'playerName': name},
+      arguments: {'grade': widget.grade, 'playerName': name},
     );
-  }
-
-  Future<void> _logout(BuildContext context) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove('playerName');
-    Navigator.pushNamedAndRemoveUntil(context, '/welcome', (_) => false);
   }
 
   @override
@@ -47,48 +94,52 @@ class MainMenuScreen extends StatelessWidget {
           final w = cons.maxWidth;
           final h = cons.maxHeight;
 
-          // ---- ukuran responsif ----
+          // ----- ukuran responsif -----
           final closeW = (w * 0.10).clamp(36.0, 56.0);
           final smallBtnW = (w * 0.26).clamp(120.0, 200.0);
           final smallBtnH = smallBtnW * 0.58;
-
           final gapY = max(10.0, smallBtnH * kRowGapFactor);
-          // jarak vertikal antar tombol
 
           final famW = (w * 0.42).clamp(180.0, 360.0);
-          final reportW = (w * 0.34).clamp(150.0, 260.0);
+          final reportW = (w * 0.32).clamp(140.0, 240.0);
+          final leaderW = (w * 0.30).clamp(130.0, 230.0);
+          const bottomGap = 12.0;
+          const btnGap = 12.0;
 
-          // ====== KLASTER SEGITIGA (rapat) ======
-          // pusat klaster (geser-geser ini kalau mau pindah klaster cepat)
-          final clusterCX = w * 0.32; // posisi horizontal klaster
+          // ----- posisi cluster segitiga -----
+          final clusterCX = w * 0.32;
           final clusterTopBase = max(h * 0.10, pad.top + 10);
           final clusterTop = clusterTopBase + h * kClusterDownFactor;
 
-          // tombol atas (LEARNING) tepat di tengah klaster
           final learningLeft = (clusterCX - smallBtnW / 2).clamp(
             8.0,
             w - smallBtnW - 8,
           );
           final learningTop = clusterTop;
 
-          // tombol kiri bawah (PLAYING)
           final playingLeft = (learningLeft - smallBtnW * 0.65).clamp(
             8.0,
             w - smallBtnW - 8,
           );
           final playingTop = learningTop + smallBtnH + gapY;
 
-          // tombol kanan bawah (EXERCISE) — overlap 45% lebar tombol supaya dekat
-          const kRightOverlap = 0.55;
+          const kRightOverlap = 0.55; // supaya LEARNING–EXERCISE lebih rapat
           final exerciseLeft = (learningLeft + smallBtnW * kRightOverlap).clamp(
             8.0,
             w - smallBtnW - 8,
           );
           final exerciseTop = playingTop;
 
-          // keluarga & report
+          // ----- family & tombol bawah di-center tepat di bawah family -----
           final famRight = w * 0.05;
           final famBottom = h * 0.16;
+          final famLeft = w - famRight - famW;
+          final totalBottomW = leaderW + btnGap + reportW;
+          final buttonsLeft = (famLeft + (famW - totalBottomW) / 2).clamp(
+            8.0,
+            w - totalBottomW - 8,
+          );
+          final buttonsBottom = max(pad.bottom + bottomGap, famBottom - 12);
 
           return Stack(
             children: [
@@ -99,7 +150,7 @@ class MainMenuScreen extends StatelessWidget {
                 ),
               ),
 
-              // keluarga di belakang tombol
+              // family (di belakang tombol)
               Positioned(
                 right: famRight,
                 bottom: famBottom,
@@ -112,15 +163,16 @@ class MainMenuScreen extends StatelessWidget {
                 ),
               ),
 
-              // close
+              // tombol close
               Positioned(
                 top: pad.top + 10,
                 right: 12,
                 child: GestureDetector(
                   onTap: () async {
+                    SoundService.instance.tap();
                     final prefs = await SharedPreferences.getInstance();
                     await prefs.remove('playerName');
-                    // ignore: use_build_context_synchronously
+                    if (!mounted) return;
                     Navigator.pushNamedAndRemoveUntil(
                       context,
                       '/welcome',
@@ -134,14 +186,14 @@ class MainMenuScreen extends StatelessWidget {
                 ),
               ),
 
-              // ====== tombol segitiga rapat ======
+              // ====== tombol segitiga (learning/playing/exercise) ======
               Positioned(
                 left: learningLeft,
                 top: learningTop,
                 child: _SvgButton(
                   assetPath: 'asset/images/learning_button.svg',
                   width: smallBtnW,
-                  onTap: () => navigateTo(context, 'learning'),
+                  onTap: () => _navigateTo(context, 'learning'),
                 ),
               ),
               Positioned(
@@ -150,7 +202,7 @@ class MainMenuScreen extends StatelessWidget {
                 child: _SvgButton(
                   assetPath: 'asset/images/playing_button.svg',
                   width: smallBtnW,
-                  onTap: () => navigateTo(context, 'playing'),
+                  onTap: () => _navigateTo(context, 'playing'),
                 ),
               ),
               Positioned(
@@ -159,18 +211,28 @@ class MainMenuScreen extends StatelessWidget {
                 child: _SvgButton(
                   assetPath: 'asset/images/exercise_button.svg',
                   width: smallBtnW,
-                  onTap: () => navigateTo(context, 'exercise'),
+                  onTap: () => _navigateTo(context, 'exercise'),
                 ),
               ),
 
-              // report kecil di bawah keluarga
+              // ====== leaderboard + report (center tepat di bawah family) ======
               Positioned(
-                right: famRight + (famW - reportW) / 2,
-                bottom: max(pad.bottom + 12, famBottom - 12),
-                child: _ImageButton(
-                  assetPath: 'asset/images/report_button.png',
-                  width: reportW,
-                  onTap: () => navigateTo(context, 'report'),
+                left: buttonsLeft,
+                bottom: buttonsBottom,
+                child: Row(
+                  children: [
+                    _ImageButton(
+                      assetPath: 'asset/images/leaderboard_button.png',
+                      width: leaderW,
+                      onTap: () => _navigateTo(context, 'leaderboard'),
+                    ),
+                    const SizedBox(width: btnGap),
+                    _ImageButton(
+                      assetPath: 'asset/images/report_button.png',
+                      width: reportW,
+                      onTap: () => _navigateTo(context, 'report'),
+                    ),
+                  ],
                 ),
               ),
             ],
@@ -181,7 +243,7 @@ class MainMenuScreen extends StatelessWidget {
   }
 }
 
-// helpers
+// Helpers
 class _SvgButton extends StatelessWidget {
   final String assetPath;
   final double width;
@@ -191,13 +253,12 @@ class _SvgButton extends StatelessWidget {
     required this.width,
     required this.onTap,
   });
+
   @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: SvgPicture.asset(assetPath, width: width, fit: BoxFit.contain),
-    );
-  }
+  Widget build(BuildContext context) => GestureDetector(
+    onTap: onTap,
+    child: SvgPicture.asset(assetPath, width: width, fit: BoxFit.contain),
+  );
 }
 
 class _ImageButton extends StatelessWidget {
@@ -209,11 +270,10 @@ class _ImageButton extends StatelessWidget {
     required this.width,
     required this.onTap,
   });
+
   @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Image.asset(assetPath, width: width, fit: BoxFit.contain),
-    );
-  }
+  Widget build(BuildContext context) => GestureDetector(
+    onTap: onTap,
+    child: Image.asset(assetPath, width: width, fit: BoxFit.contain),
+  );
 }

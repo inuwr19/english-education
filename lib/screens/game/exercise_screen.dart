@@ -1,5 +1,7 @@
 // lib/screens/game/exercise_screen.dart
 import 'dart:math';
+import 'package:english_education/shared/route_observer.dart';
+import 'package:english_education/shared/sound_service.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -116,7 +118,7 @@ List<ExerciseQuestion> _g1LetterFixedAsExercise() {
       .toList();
 }
 
-class _ExerciseScreenState extends State<ExerciseScreen> {
+class _ExerciseScreenState extends State<ExerciseScreen> with RouteAware {
   late final List<ExerciseQuestion> _items;
   int _index = 0;
   int _score = 0;
@@ -127,6 +129,36 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
     super.initState();
     _items = (widget.questions ?? _buildPool(widget.grade))..shuffle();
     _startedAt = DateTime.now();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final route = ModalRoute.of(context);
+    if (route is PageRoute) {
+      routeObserver.subscribe(this, route);
+    }
+  }
+
+  @override
+  void dispose() {
+    routeObserver.unsubscribe(this);
+    super.dispose();
+  }
+
+  @override
+  void didPush() {
+    SoundService.instance.playExerciseBgm();
+  }
+
+  @override
+  void didPopNext() {
+    SoundService.instance.playExerciseBgm();
+  }
+
+  @override
+  void didPushNext() {
+    SoundService.instance.fadeOutBgm(dur: const Duration(milliseconds: 150));
   }
 
   // ---------- Question + Helper functions ----------
@@ -458,7 +490,12 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
   void _pick(String selected) {
     final q = _items[_index];
     final isCorrect = selected == q.answer;
-    if (isCorrect) _score += 1;
+    if (isCorrect) {
+      _score += 1;
+      SoundService.instance.correct(); // ⬅️ benar
+    } else {
+      SoundService.instance.wrong(); // ⬅️ salah
+    }
 
     if (_index + 1 >= _items.length) {
       _finish();
@@ -470,9 +507,11 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
   Future<void> _finish() async {
     // Ambil nama dari prefs jika argumen kosong
     final prefs = await SharedPreferences.getInstance();
-    final playerName = (widget.userName.isNotEmpty
-        ? widget.userName
-        : (prefs.getString('playerName') ?? 'Player'));
+    final arg = widget.userName.trim().toLowerCase();
+    final validArg = arg.isNotEmpty && arg != 'player' && arg != 'unknown';
+    final playerName = validArg
+        ? widget.userName.trim()
+        : (prefs.getString('playerName') ?? 'Player');
 
     // 🔢 Skor skala 100 (bukan persen, tapi nilai maksimumnya 100)
     final score100 = ((_score / _items.length) * 100).round();
@@ -729,7 +768,10 @@ class _OptionsBar extends StatelessWidget {
           _OptionPill(
             label: String.fromCharCode(97 + i), // a,b,c
             text: options[i],
-            onTap: () => onPick(options[i]),
+            onTap: () {
+              SoundService.instance.tap();
+              onPick(options[i]);
+            },
           ),
       ],
     );

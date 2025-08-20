@@ -40,6 +40,8 @@ dependencies:
   auto_size_text: ^3.0.0
   shared_preferences: ^2.5.3
   intl: ^0.20.2
+  audioplayers: ^6.5.0
+
 
 dev_dependencies:
   flutter_test:
@@ -66,6 +68,14 @@ flutter:
 
   # To add assets to your application, add an assets section, like this:
   assets:
+    # Sound
+    - asset/sounds/
+    # - asset/sounds/bgm_menu.mp3
+    # - asset/sounds/bgm_exercise.mp3
+    # - asset/sounds/sfx_tap.mp3
+    # - asset/sounds/sfx_correct.mp3
+    # - asset/sounds/sfx_wrong.mp3
+    # 
     - asset/images/splash_logo.jpg
     - asset/images/teks_splash.png
     - asset/images/welcome_title.png
@@ -88,6 +98,7 @@ flutter:
     - asset/images/learning_button.svg
     - asset/images/report_button.svg
     - asset/images/report_button.png
+    - asset/images/leaderboard_button.png
     - asset/images/close_button.svg
     - asset/images/mainmenu_family.svg
     - asset/images/mainmenu_logo.png

@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:english_education/routes.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:english_education/shared/sound_service.dart';
+import 'package:english_education/shared/route_observer.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
+  await SoundService.warmup();
   runApp(const MyApp());
 }
 
@@ -21,6 +24,7 @@ class MyApp extends StatelessWidget {
       initialRoute: '/',
       onGenerateRoute:
           generateRoute, // ganti dari 'routes' ke 'onGenerateRoute'
+      navigatorObservers: [routeObserver],
     );
   }
 }

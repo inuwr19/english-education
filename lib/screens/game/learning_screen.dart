@@ -1,4 +1,5 @@
 import 'dart:math';
+import 'package:english_education/shared/sound_service.dart';
 import 'package:flutter/material.dart';
 import '../../widgets/button.dart';
 import '../../widgets/text.dart';
@@ -310,7 +311,10 @@ class OptionCard extends StatelessWidget {
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        onTap: onTap,
+        onTap: () {
+          SoundService.instance.tap();
+          onTap();
+        },
         borderRadius: BorderRadius.circular(16),
         splashColor: Colors.orange.withOpacity(0.15),
         highlightColor: Colors.orange.withOpacity(0.08),
@@ -390,7 +394,13 @@ class _LearningScreenState extends State<LearningScreen> {
       final answer = (question as dynamic).correctAnswer as String;
       correct = selected == answer;
     }
-    correct ? nextQuestion(true) : wrongAnswer();
+    if (correct) {
+      SoundService.instance.correct();
+      nextQuestion(true);
+    } else {
+      SoundService.instance.wrong();
+      wrongAnswer();
+    }
   }
 
   void nextQuestion(bool correct) {
@@ -547,6 +557,8 @@ class _LearningScreenState extends State<LearningScreen> {
     }
 
     final q = questions[currentQuestionIndex];
+    final mq = MediaQuery.of(context);
+    final bottomSafe = max(mq.viewPadding.bottom, 16.0);
 
     return Scaffold(
       body: Container(
@@ -560,7 +572,7 @@ class _LearningScreenState extends State<LearningScreen> {
         child: SafeArea(
           child: Column(
             children: [
-              /// Header
+              // HEADER
               Padding(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 16,
@@ -573,31 +585,25 @@ class _LearningScreenState extends State<LearningScreen> {
                       onTap: () => Navigator.pop(context),
                       child: Image.asset(
                         'asset/images/back_button.png',
-                        height: 48,
-                        errorBuilder: (c, e, s) => Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.8),
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(
-                            Icons.arrow_back,
-                            color: Colors.blue,
-                          ),
+                        height:
+                            44, // sedikit lebih kecil agar aman di device kecil
+                        errorBuilder: (c, e, s) => const CircleAvatar(
+                          backgroundColor: Colors.white70,
+                          child: Icon(Icons.arrow_back, color: Colors.blue),
                         ),
                       ),
                     ),
                     Container(
                       padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 8,
+                        horizontal: 14,
+                        vertical: 7,
                       ),
                       decoration: BoxDecoration(
                         color: Colors.white.withOpacity(0.9),
-                        borderRadius: BorderRadius.circular(20),
+                        borderRadius: BorderRadius.circular(18),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withOpacity(0.1),
+                            color: Colors.black.withOpacity(0.08),
                             blurRadius: 4,
                             offset: const Offset(0, 2),
                           ),
@@ -606,7 +612,7 @@ class _LearningScreenState extends State<LearningScreen> {
                       child: Text(
                         'Score: $score / ${questions.length}',
                         style: const TextStyle(
-                          fontSize: 16,
+                          fontSize: 15,
                           fontWeight: FontWeight.bold,
                           color: Colors.indigo,
                         ),
@@ -616,128 +622,88 @@ class _LearningScreenState extends State<LearningScreen> {
                 ),
               ),
 
-              /// Content (tiap grade fixed, tanpa scroll)
+              // CONTENT
               Expanded(
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  padding: EdgeInsets.fromLTRB(16, 0, 16, bottomSafe),
                   child: LayoutBuilder(
-                    builder: (context, constraints) {
-                      final h = constraints.maxHeight;
+                    builder: (context, cons) {
+                      final h = cons.maxHeight;
+                      final compact =
+                          h < 700; // fallback ke scroll kalau sempit
+
+                      Widget content;
 
                       if (widget.grade == 1) {
-                        // Slot tinggi: kata/angka + hint & grid opsi 2x2
-                        final topH = h * 0.42;
-                        final optH = h * 0.42;
-                        final gapH = h * 0.04;
-
+                        // --- TOP (kata/angka/hint) ---
                         Widget topArea;
                         if (q is Question) {
-                          topArea = SizedBox(
-                            height: topH,
-                            child: Center(
-                              child: GradientStrokeText(
-                                text: q.questionText,
-                                maxFontSize: 56,
-                              ),
+                          topArea = Center(
+                            child: GradientStrokeText(
+                              text: q.questionText,
+                              maxFontSize: 56,
                             ),
                           );
                         } else if (q is LetterQuestion) {
-                          topArea = SizedBox(
-                            height: topH,
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                GradientStrokeText(
-                                  text: q.incompleteWord,
-                                  maxFontSize: 56,
-                                ),
-                                const SizedBox(height: 8),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 12,
-                                    vertical: 6,
-                                  ),
-                                  // decoration: BoxDecoration(
-                                  //   color: Colors.white.withOpacity(0.85),
-                                  //   borderRadius: BorderRadius.circular(8),
-                                  //   border: Border.all(
-                                  //     color: Colors.blue.shade300,
-                                  //     width: 1.5,
-                                  //   ),
-                                  // ),
-                                  // child: Text(
-                                  //   "Hint: ${q.hint}",
-                                  //   style: const TextStyle(
-                                  //     fontSize: 14,
-                                  //     fontWeight: FontWeight.w600,
-                                  //     color: Colors.indigo,
-                                  //   ),
-                                  // ),
-                                ),
-                              ],
-                            ),
+                          topArea = Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              GradientStrokeText(
+                                text: q.incompleteWord,
+                                maxFontSize: 56,
+                              ),
+                              const SizedBox(height: 8),
+                              // hint kalau perlu
+                            ],
                           );
                         } else {
-                          topArea = SizedBox(height: topH);
+                          topArea = const SizedBox.shrink();
                         }
 
+                        // --- BUTTONS ---
                         List<Widget> buttons = [];
-
                         if (q is Question) {
                           final nums = generateAnswerOptions(q.correctAnswer);
                           buttons = nums
+                              .take(4)
                               .map(
                                 (n) => _btnG1(
                                   n.toString(),
                                   () => checkAnswer(q, n),
                                 ),
-                              ) // kirim int n
+                              )
                               .toList();
                         } else if (q is LetterQuestion) {
                           final letters = generateLetterOptions(
                             q.correctLetter,
                           );
                           buttons = letters
-                              .map(
-                                (l) => _btnG1(l, () => checkAnswer(q, l)),
-                              ) // tetap String
+                              .take(4)
+                              .map((l) => _btnG1(l, () => checkAnswer(q, l)))
                               .toList();
                         }
 
-                        final grid = SizedBox(
-                          height: optH,
-                          child: LayoutBuilder(
-                            builder: (context, c) {
-                              final gap = 12.0;
-                              final itemW = (c.maxWidth - gap) / 2;
-                              final childAspectRatio = itemW / 56.0;
-                              return GridView.count(
-                                crossAxisCount: 2,
-                                mainAxisSpacing: gap,
-                                crossAxisSpacing: gap,
-                                physics: const NeverScrollableScrollPhysics(),
-                                childAspectRatio: childAspectRatio,
-                                children: buttons,
-                              );
-                            },
-                          ),
-                        );
-
+                        // --- SUSUN: top fleksibel + grid mengisi sisa ruang ---
                         return Column(
                           children: [
                             const SizedBox(height: 8),
-                            topArea,
-                            SizedBox(height: gapH),
-                            grid,
-                            const Spacer(),
+                            Flexible(
+                              // tidak fixed height lagi
+                              flex: 5,
+                              child: topArea,
+                            ),
+                            const SizedBox(height: 8),
+                            Expanded(
+                              // grid ambil sisa ruang dengan aman
+                              flex: 5,
+                              child: _gridOptionsG1(buttons),
+                            ),
                           ],
                         );
-                      }
-
-                      if (widget.grade == 2) {
-                        final imgMaxH = h * 0.22;
-                        final qH = h * 0.20;
-                        final optH = h * 0.48;
+                      } else if (widget.grade == 2) {
+                        // ---------- GRADE 2 ----------
+                        final imgMaxH = compact ? h * 0.18 : h * 0.22;
+                        final optH = compact ? h * 0.48 : h * 0.50;
 
                         Widget topArea;
                         if (q is ImageMCQQuestion) {
@@ -748,7 +714,7 @@ class _LearningScreenState extends State<LearningScreen> {
                               const SizedBox(height: 8),
                               _questionBox(
                                 q.questionText,
-                                fontSize: 18,
+                                fontSize: compact ? 16 : 18,
                                 maxLines: 2,
                               ),
                             ],
@@ -756,16 +722,18 @@ class _LearningScreenState extends State<LearningScreen> {
                         } else if (q is MCQQuestion) {
                           topArea = _questionBox(
                             q.questionText,
-                            fontSize: 18,
+                            fontSize: compact ? 16 : 18,
                             maxLines: 2,
                           );
                         } else {
-                          topArea = SizedBox(height: qH);
+                          topArea = const SizedBox.shrink();
                         }
 
-                        List<String> opts = [];
-                        if (q is ImageMCQQuestion) opts = q.options;
-                        if (q is MCQQuestion) opts = q.options;
+                        final opts = (q is ImageMCQQuestion)
+                            ? q.options
+                            : (q is MCQQuestion)
+                            ? q.options
+                            : <String>[];
 
                         final options = SizedBox(
                           height: optH,
@@ -776,70 +744,87 @@ class _LearningScreenState extends State<LearningScreen> {
                           ),
                         );
 
-                        return Column(
+                        content = Column(
                           children: [
-                            const SizedBox(height: 10),
+                            const SizedBox(height: 8),
                             topArea,
                             const SizedBox(height: 8),
                             options,
-                            const Spacer(),
+                            if (!compact) const Spacer(),
+                          ],
+                        );
+                      } else {
+                        // ---------- GRADE 3 ----------
+                        final imgMaxH = compact ? h * 0.22 : h * 0.28;
+                        final qBoxH = compact ? h * 0.16 : h * 0.18;
+                        final optH = compact ? h * 0.46 : h * 0.40;
+
+                        String qText = "";
+                        Widget img = const SizedBox.shrink();
+                        if (q is DailyActivityQuestion) {
+                          img = _boundedImage(q.imagePath, imgMaxH);
+                          qText = q.questionText;
+                        } else if (q is PrepositionQuestion) {
+                          img = _boundedImage(q.imagePath, imgMaxH);
+                          qText = q.questionText;
+                        } else if (q is ImageMCQQuestion) {
+                          img = _boundedImage(q.imagePath, imgMaxH);
+                          qText = q.questionText;
+                        } else if (q is MCQQuestion) {
+                          qText = q.questionText;
+                        }
+
+                        final questionBox = SizedBox(
+                          height: qBoxH,
+                          child: Center(
+                            child: _questionBox(
+                              qText,
+                              fontSize: compact ? 16 : 18,
+                              maxLines: 3,
+                            ),
+                          ),
+                        );
+
+                        final opts = (q is DailyActivityQuestion)
+                            ? q.options
+                            : (q is PrepositionQuestion)
+                            ? q.options
+                            : (q is ImageMCQQuestion)
+                            ? q.options
+                            : (q is MCQQuestion)
+                            ? q.options
+                            : <String>[];
+
+                        final options = SizedBox(
+                          height: optH,
+                          child: _twoColsGridG3(
+                            options: opts,
+                            onTap: (sel) => checkAnswer(q, sel),
+                            compact: compact,
+                          ),
+                        );
+
+                        content = Column(
+                          children: [
+                            const SizedBox(height: 8),
+                            img,
+                            const SizedBox(height: 8),
+                            questionBox,
+                            const SizedBox(height: 12),
+                            options,
+                            if (!compact) const Spacer(),
                           ],
                         );
                       }
 
-                      // grade 3
-                      final imgMaxH = h * 0.28;
-                      final qBoxH = h * 0.18;
-                      final optH = h * 0.40;
-
-                      String qText = "";
-                      Widget img = const SizedBox.shrink();
-
-                      if (q is DailyActivityQuestion) {
-                        img = _boundedImage(q.imagePath, imgMaxH);
-                        qText = q.questionText;
-                      } else if (q is PrepositionQuestion) {
-                        img = _boundedImage(q.imagePath, imgMaxH);
-                        qText = q.questionText;
-                      } else if (q is ImageMCQQuestion) {
-                        img = _boundedImage(q.imagePath, imgMaxH);
-                        qText = q.questionText;
-                      } else if (q is MCQQuestion) {
-                        qText = q.questionText;
+                      // ❗️Fallback ke scroll bila very-compact
+                      if (compact) {
+                        return SingleChildScrollView(
+                          physics: const BouncingScrollPhysics(),
+                          child: content,
+                        );
                       }
-
-                      final questionBox = SizedBox(
-                        height: qBoxH,
-                        child: Center(
-                          child: _questionBox(qText, fontSize: 18, maxLines: 3),
-                        ),
-                      );
-
-                      List<String> opts = [];
-                      if (q is DailyActivityQuestion) opts = q.options;
-                      if (q is PrepositionQuestion) opts = q.options;
-                      if (q is ImageMCQQuestion) opts = q.options;
-                      if (q is MCQQuestion) opts = q.options;
-
-                      final options = SizedBox(
-                        height: optH,
-                        child: _twoColsGridG3(
-                          options: opts,
-                          onTap: (sel) => checkAnswer(q, sel),
-                        ),
-                      );
-
-                      return Column(
-                        children: [
-                          const SizedBox(height: 8),
-                          img,
-                          const SizedBox(height: 8),
-                          questionBox,
-                          const SizedBox(height: 12),
-                          options,
-                          const Spacer(),
-                        ],
-                      );
+                      return content;
                     },
                   ),
                 ),
@@ -854,42 +839,65 @@ class _LearningScreenState extends State<LearningScreen> {
   Widget _twoColsGridG3({
     required List<String> options,
     required void Function(String) onTap,
+    bool compact = false,
   }) {
     const cols = 2;
     const gap = 12.0;
-
-    // Paksa 2x2: ambil tepat 4 item; kalau kurang, pad dengan kosong
     final items = (options.length >= 4)
         ? options.take(4).toList()
         : [...options, ...List.filled(4 - options.length, '')];
 
     return LayoutBuilder(
       builder: (context, c) {
-        // tinggi cell tetap supaya rapi; ubah 56–72 sesuai selera
-        const cellH = 60.0;
-
+        final cellH = compact ? 52.0 : 60.0; // sedikit lebih pendek saat sempit
         return GridView.builder(
           physics: const NeverScrollableScrollPhysics(),
           shrinkWrap: true,
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: cols,
             crossAxisSpacing: gap,
             mainAxisSpacing: gap,
             mainAxisExtent: cellH,
           ),
-          itemCount: 4, // selalu 4 cell → 2 kiri + 2 kanan
+          itemCount: 4,
           itemBuilder: (_, i) {
             final text = items[i];
-            if (text.isEmpty) {
-              return const SizedBox.shrink(); // placeholder kosong
-            }
+            if (text.isEmpty) return const SizedBox.shrink();
             return OptionCard(
               text: text,
               onTap: () => onTap(text),
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-              maxFontSize: 18, // sedikit lebih kecil untuk G3
+              maxFontSize: compact ? 17 : 18,
             );
           },
+        );
+      },
+    );
+  }
+
+  Widget _gridOptionsG1(List<Widget> buttons) {
+    const cols = 2;
+    const gap = 12.0;
+
+    return LayoutBuilder(
+      builder: (context, c) {
+        // tinggi setiap cell tombol; aman di semua device
+        const cellH = 60.0;
+
+        return GridView.builder(
+          physics: const NeverScrollableScrollPhysics(),
+          padding: const EdgeInsets.only(
+            bottom: 12,
+          ), // ruang ekstra agar tak “ngepas”
+          shrinkWrap: true,
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: cols,
+            crossAxisSpacing: gap,
+            mainAxisSpacing: gap,
+            mainAxisExtent: cellH, // <- bukan aspectRatio lagi
+          ),
+          itemCount: buttons.length.clamp(0, 4), // 2x2
+          itemBuilder: (_, i) => buttons[i],
         );
       },
     );

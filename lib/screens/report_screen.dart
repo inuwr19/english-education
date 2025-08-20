@@ -203,7 +203,7 @@ class _ReportTable extends StatelessWidget {
           final rawScore = (d['score'] ?? 0) as int;
           final percent = (d['percent'] is num)
               ? (d['percent'] as num).toInt()
-              : (total > 0 ? ((rawScore / total) * 100).round() : 0);
+              : (total > 0 ? ((rawScore / total) * 10).round() : 0);
 
           // tanggal: createdAt (Timestamp) atau finishedAt (ISO)
           final dt = _pickBestDate(d);
