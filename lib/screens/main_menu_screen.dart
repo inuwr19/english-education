@@ -91,14 +91,22 @@ class _MainMenuScreenState extends State<MainMenuScreen> with RouteAware {
       body: LayoutBuilder(
         builder: (context, cons) {
           final pad = MediaQuery.of(context).viewPadding;
-          final w = cons.maxWidth;
-          final h = cons.maxHeight;
 
-          // ----- ukuran responsif -----
+          // 1) Kanvas desain (bebas pilih, saya pakai 430×900 seperti iPhone 12-ish)
+          const double designW = 430;
+          const double designH = 900;
+
+          // 2) Semua ukuran/posisi dihitung pakai SISI DESAIN (bukan layar nyata)
+          //    Supaya konsisten, lalu discale dengan FittedBox.
+          final w = designW;
+          final h = designH;
+
+          // ----- ukuran responsif DI ATAS KANVAS DESAIN -----
+          // angka-angka ini sama idenya dengan punyamu, tapi berbasis designW/H
           final closeW = (w * 0.10).clamp(36.0, 56.0);
           final smallBtnW = (w * 0.26).clamp(120.0, 200.0);
           final smallBtnH = smallBtnW * 0.58;
-          final gapY = max(10.0, smallBtnH * kRowGapFactor);
+          final gapY = max(10.0, smallBtnH * 0.26);
 
           final famW = (w * 0.42).clamp(180.0, 360.0);
           final reportW = (w * 0.32).clamp(140.0, 240.0);
@@ -108,8 +116,11 @@ class _MainMenuScreenState extends State<MainMenuScreen> with RouteAware {
 
           // ----- posisi cluster segitiga -----
           final clusterCX = w * 0.32;
-          final clusterTopBase = max(h * 0.10, pad.top + 10);
-          final clusterTop = clusterTopBase + h * kClusterDownFactor;
+          final clusterTopBase = max(
+            h * 0.10,
+            10,
+          ); // pad.top “disimulasikan”: 10
+          final clusterTop = clusterTopBase + h * 0.06;
 
           final learningLeft = (clusterCX - smallBtnW / 2).clamp(
             8.0,
@@ -123,14 +134,14 @@ class _MainMenuScreenState extends State<MainMenuScreen> with RouteAware {
           );
           final playingTop = learningTop + smallBtnH + gapY;
 
-          const kRightOverlap = 0.55; // supaya LEARNING–EXERCISE lebih rapat
+          double kRightOverlap = 0.55;
           final exerciseLeft = (learningLeft + smallBtnW * kRightOverlap).clamp(
             8.0,
             w - smallBtnW - 8,
           );
           final exerciseTop = playingTop;
 
-          // ----- family & tombol bawah di-center tepat di bawah family -----
+          // ----- family & tombol bawah -----
           final famRight = w * 0.05;
           final famBottom = h * 0.16;
           final famLeft = w - famRight - famW;
@@ -139,103 +150,185 @@ class _MainMenuScreenState extends State<MainMenuScreen> with RouteAware {
             8.0,
             w - totalBottomW - 8,
           );
-          final buttonsBottom = max(pad.bottom + bottomGap, famBottom - 12);
+          final buttonsBottom = max(bottomGap, famBottom - 12);
 
-          return Stack(
-            children: [
-              Positioned.fill(
-                child: Image.asset(
-                  'asset/images/mainmenu_bg.png',
-                  fit: BoxFit.cover,
-                ),
+          // 3) COLLISION GUARD (anti tumpuk):
+          //    Pastikan cluster segitiga tidak “menabrak” area family+bottom buttons.
+          final clusterBottom =
+              playingTop +
+              smallBtnH; // dua baris: learning + (playing/exercise)
+          final bottomReservedTop =
+              h -
+              (buttonsBottom +
+                  max(leaderW, reportW) * 0.45); // kira2 tinggi tombol bawah
+
+          if (clusterBottom > bottomReservedTop) {
+            final shiftUp = clusterBottom - bottomReservedTop + 16; // margin
+            // geser trio tombol ke atas seperlunya
+            final newLearningTop = max(learningTop - shiftUp, pad.top + 10);
+            final delta = learningTop - newLearningTop;
+
+            // terapkan shift
+            // (pakai var agar mudah diedit bila perlu)
+            final _learningTop = newLearningTop;
+            final _playingTop = playingTop - delta;
+            final _exerciseTop = exerciseTop - delta;
+
+            // tulis ulang variabel final via shadowing (untuk simplicity patch):
+            return _ScaledMenu(
+              pad: pad,
+              designW: designW,
+              designH: designH,
+              buildChild: (context) => Stack(
+                children: [
+                  // background tetap di luar (full screen) — kita pasang di bawah
+                  // group interaktif:
+                  // tombol close
+                  Positioned(
+                    top: pad.top + 10,
+                    right: 12,
+                    child: _CloseButton(width: closeW),
+                  ),
+                  // family
+                  Positioned(
+                    right: famRight,
+                    bottom: famBottom,
+                    child: IgnorePointer(
+                      ignoring: true,
+                      child: SvgPicture.asset(
+                        'asset/images/mainmenu_family.svg',
+                        width: famW,
+                      ),
+                    ),
+                  ),
+                  // trio (LEARNING/PLAYING/EXERCISE) — sudah di-shift
+                  Positioned(
+                    left: learningLeft,
+                    top: _learningTop,
+                    child: _SvgButton(
+                      assetPath: 'asset/images/learning_button.svg',
+                      width: smallBtnW,
+                      onTap: () => _navigateTo(context, 'learning'),
+                    ),
+                  ),
+                  Positioned(
+                    left: playingLeft,
+                    top: _playingTop,
+                    child: _SvgButton(
+                      assetPath: 'asset/images/playing_button.svg',
+                      width: smallBtnW,
+                      onTap: () => _navigateTo(context, 'playing'),
+                    ),
+                  ),
+                  Positioned(
+                    left: exerciseLeft,
+                    top: _exerciseTop,
+                    child: _SvgButton(
+                      assetPath: 'asset/images/exercise_button.svg',
+                      width: smallBtnW,
+                      onTap: () => _navigateTo(context, 'exercise'),
+                    ),
+                  ),
+                  // bottom buttons
+                  Positioned(
+                    left: buttonsLeft,
+                    bottom: buttonsBottom,
+                    child: Row(
+                      children: [
+                        _ImageButton(
+                          assetPath: 'asset/images/leaderboard_button.png',
+                          width: leaderW,
+                          onTap: () => _navigateTo(context, 'leaderboard'),
+                        ),
+                        const SizedBox(width: btnGap),
+                        _ImageButton(
+                          assetPath: 'asset/images/report_button.png',
+                          width: reportW,
+                          onTap: () => _navigateTo(context, 'report'),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
+            );
+          }
 
-              // family (di belakang tombol)
-              Positioned(
-                right: famRight,
-                bottom: famBottom,
-                child: IgnorePointer(
-                  ignoring: true,
-                  child: SvgPicture.asset(
-                    'asset/images/mainmenu_family.svg',
-                    width: famW,
+          // 4) TANPA tabrakan → render normal pada kanvas desain
+          return _ScaledMenu(
+            pad: pad,
+            designW: designW,
+            designH: designH,
+            buildChild: (context) => Stack(
+              children: [
+                // tombol close
+                Positioned(
+                  top: pad.top + 10,
+                  right: 12,
+                  child: _CloseButton(width: closeW),
+                ),
+                // family
+                Positioned(
+                  right: famRight,
+                  bottom: famBottom,
+                  child: IgnorePointer(
+                    ignoring: true,
+                    child: SvgPicture.asset(
+                      'asset/images/mainmenu_family.svg',
+                      width: famW,
+                    ),
                   ),
                 ),
-              ),
-
-              // tombol close
-              Positioned(
-                top: pad.top + 10,
-                right: 12,
-                child: GestureDetector(
-                  onTap: () async {
-                    SoundService.instance.tap();
-                    final prefs = await SharedPreferences.getInstance();
-                    await prefs.remove('playerName');
-                    if (!mounted) return;
-                    Navigator.pushNamedAndRemoveUntil(
-                      context,
-                      '/welcome',
-                      (_) => false,
-                    );
-                  },
-                  child: SvgPicture.asset(
-                    'asset/images/close_button.svg',
-                    width: closeW,
+                // trio segitiga
+                Positioned(
+                  left: learningLeft,
+                  top: learningTop,
+                  child: _SvgButton(
+                    assetPath: 'asset/images/learning_button.svg',
+                    width: smallBtnW,
+                    onTap: () => _navigateTo(context, 'learning'),
                   ),
                 ),
-              ),
-
-              // ====== tombol segitiga (learning/playing/exercise) ======
-              Positioned(
-                left: learningLeft,
-                top: learningTop,
-                child: _SvgButton(
-                  assetPath: 'asset/images/learning_button.svg',
-                  width: smallBtnW,
-                  onTap: () => _navigateTo(context, 'learning'),
+                Positioned(
+                  left: playingLeft,
+                  top: playingTop,
+                  child: _SvgButton(
+                    assetPath: 'asset/images/playing_button.svg',
+                    width: smallBtnW,
+                    onTap: () => _navigateTo(context, 'playing'),
+                  ),
                 ),
-              ),
-              Positioned(
-                left: playingLeft,
-                top: playingTop,
-                child: _SvgButton(
-                  assetPath: 'asset/images/playing_button.svg',
-                  width: smallBtnW,
-                  onTap: () => _navigateTo(context, 'playing'),
+                Positioned(
+                  left: exerciseLeft,
+                  top: exerciseTop,
+                  child: _SvgButton(
+                    assetPath: 'asset/images/exercise_button.svg',
+                    width: smallBtnW,
+                    onTap: () => _navigateTo(context, 'exercise'),
+                  ),
                 ),
-              ),
-              Positioned(
-                left: exerciseLeft,
-                top: exerciseTop,
-                child: _SvgButton(
-                  assetPath: 'asset/images/exercise_button.svg',
-                  width: smallBtnW,
-                  onTap: () => _navigateTo(context, 'exercise'),
+                // bottom buttons
+                Positioned(
+                  left: buttonsLeft,
+                  bottom: buttonsBottom,
+                  child: Row(
+                    children: [
+                      _ImageButton(
+                        assetPath: 'asset/images/leaderboard_button.png',
+                        width: leaderW,
+                        onTap: () => _navigateTo(context, 'leaderboard'),
+                      ),
+                      const SizedBox(width: btnGap),
+                      _ImageButton(
+                        assetPath: 'asset/images/report_button.png',
+                        width: reportW,
+                        onTap: () => _navigateTo(context, 'report'),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-
-              // ====== leaderboard + report (center tepat di bawah family) ======
-              Positioned(
-                left: buttonsLeft,
-                bottom: buttonsBottom,
-                child: Row(
-                  children: [
-                    _ImageButton(
-                      assetPath: 'asset/images/leaderboard_button.png',
-                      width: leaderW,
-                      onTap: () => _navigateTo(context, 'leaderboard'),
-                    ),
-                    const SizedBox(width: btnGap),
-                    _ImageButton(
-                      assetPath: 'asset/images/report_button.png',
-                      width: reportW,
-                      onTap: () => _navigateTo(context, 'report'),
-                    ),
-                  ],
-                ),
-              ),
-            ],
+              ],
+            ),
           );
         },
       ),
@@ -244,6 +337,63 @@ class _MainMenuScreenState extends State<MainMenuScreen> with RouteAware {
 }
 
 // Helpers
+/// Widget pembungkus yang menangani scaling + background full-screen.
+class _ScaledMenu extends StatelessWidget {
+  final EdgeInsets pad;
+  final double designW;
+  final double designH;
+  final WidgetBuilder buildChild;
+  const _ScaledMenu({
+    required this.pad,
+    required this.designW,
+    required this.designH,
+    required this.buildChild,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      children: [
+        // Background tetap FULL layar
+        Positioned.fill(
+          child: Image.asset('asset/images/mainmenu_bg.png', fit: BoxFit.cover),
+        ),
+
+        // Kanvas desain yang diskalakan proporsional
+        Center(
+          child: FittedBox(
+            fit: BoxFit.contain, // seluruh kanvas masuk layar, tidak terpotong
+            child: SizedBox(
+              width: designW,
+              height: designH,
+              child: buildChild(context),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Tombol close yang juga hapus nama & kembali ke welcome
+class _CloseButton extends StatelessWidget {
+  final double width;
+  const _CloseButton({required this.width});
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () async {
+        SoundService.instance.tap();
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.remove('playerName');
+        if (!context.mounted) return;
+        Navigator.pushNamedAndRemoveUntil(context, '/welcome', (_) => false);
+      },
+      child: SvgPicture.asset('asset/images/close_button.svg', width: width),
+    );
+  }
+}
+
 class _SvgButton extends StatelessWidget {
   final String assetPath;
   final double width;

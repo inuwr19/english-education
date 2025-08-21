@@ -635,7 +635,12 @@ class _LearningScreenState extends State<LearningScreen> {
                       Widget content;
 
                       if (widget.grade == 1) {
-                        // --- TOP (kata/angka/hint) ---
+                        // -------- Grade 1 --------
+                        final h = cons.maxHeight;
+                        final compact =
+                            h < 620; // ambang “layar pendek” (boleh kamu ubah)
+
+                        // TOP AREA
                         Widget topArea;
                         if (q is Question) {
                           topArea = Center(
@@ -646,21 +651,20 @@ class _LearningScreenState extends State<LearningScreen> {
                           );
                         } else if (q is LetterQuestion) {
                           topArea = Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
+                            mainAxisSize: MainAxisSize.min,
                             children: [
                               GradientStrokeText(
                                 text: q.incompleteWord,
                                 maxFontSize: 56,
                               ),
                               const SizedBox(height: 8),
-                              // hint kalau perlu
                             ],
                           );
                         } else {
                           topArea = const SizedBox.shrink();
                         }
 
-                        // --- BUTTONS ---
+                        // BUTTONS
                         List<Widget> buttons = [];
                         if (q is Question) {
                           final nums = generateAnswerOptions(q.correctAnswer);
@@ -683,23 +687,25 @@ class _LearningScreenState extends State<LearningScreen> {
                               .toList();
                         }
 
-                        // --- SUSUN: top fleksibel + grid mengisi sisa ruang ---
-                        return Column(
+                        final content = Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
                             const SizedBox(height: 8),
-                            Flexible(
-                              // tidak fixed height lagi
-                              flex: 5,
-                              child: topArea,
-                            ),
+                            topArea,
+                            const SizedBox(height: 12),
+                            // Grid TIDAK dibungkus Expanded lagi → tinggi fleksibel
+                            _gridOptionsG1(buttons),
                             const SizedBox(height: 8),
-                            Expanded(
-                              // grid ambil sisa ruang dengan aman
-                              flex: 5,
-                              child: _gridOptionsG1(buttons),
-                            ),
                           ],
                         );
+
+                        // Kalau sempit → scroll; kalau lega → tidak scroll
+                        return compact
+                            ? SingleChildScrollView(
+                                physics: const BouncingScrollPhysics(),
+                                child: content,
+                              )
+                            : content;
                       } else if (widget.grade == 2) {
                         // ---------- GRADE 2 ----------
                         final imgMaxH = compact ? h * 0.18 : h * 0.22;
